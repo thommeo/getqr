@@ -3,11 +3,12 @@
 var fs = require('fs');
 var csv = require('csv');
 var request = require('request');
+var querystring = require('querystring');
 var normalizeForSearch = require("normalize-for-search");
 
 // Constants
 
-var url = 'http://online-barcode-generator.com/';
+var url = "http://chart.apis.google.com/chart"
 
 var address = {
 	'Germany': {
@@ -27,6 +28,7 @@ var address = {
 		country: 'USA',
 	}
 };
+
 
 var defaultLocation = 'Germany';
 
@@ -79,21 +81,20 @@ function executeRequest(index) {
 	var row = requestData.row;
 	var filename = requestData.filename;
 
-	var postData = data;
+	var postData = {
+		chs: "500x500",
+		cht: "qr",
+		chld: "L|4", // L, M, Q, H | margin
+		chl: data.join("\n"),
+	};
 
-	request.post(url, { form: postData }, function(error, respond, body){
-		console.log('QR code generated for '+row.Name);
-
-		// Downloa the file
-		var parts = String(body).split('#');
-		var code = parts[4];
-		request(url + '/temp/' + code + '.' + extension)
-			.pipe(fs.createWriteStream(__dirname + '/result/'+filename+'.'+extension));
-
-		// Invoke next request
-		executeRequest(index + 1);
-
-	});
+	request( url + '?' + querystring.stringify(postData),
+		function(error, respond, body){
+			console.log('QR code generated for '+row.Name);
+			executeRequest(index + 1);
+		}
+	)
+	.pipe(fs.createWriteStream(__dirname + '/result/'+filename+'.'+extension));
 
 }
 
@@ -101,14 +102,15 @@ function executeRequest(index) {
 function getFilename( row ) {
 	return String(normalizeForSearch(row.Name))
 		.toLowerCase()
-		.replace(/[\s\.\-]+/g, '_');
+		.replace(/[\s\.\-]+/g, '_')
+		.replace('?', '_');
 }
 
 
 function getRow( row ) {
 	var nameparts = String(row.Name).split(' ');
-	row.FirstName = nameparts[0];
-	row.LastName = nameparts[1];
+	row.FirstName = nameparts.shift();
+	row.LastName = nameparts.join(' ');
 	return row;
 }
 
@@ -121,48 +123,23 @@ function getData( row ) {
 		currentAddress = address[defaultLocation];
 	}
 
-	var data = {
-		codetype: 'qrcode',
-		qrtype: '6',
-		text2display: '',
-		hlink: '',
-		phone: row.PhoneOffice,
-		email: row.Email,
-		mefname: row.FirstName,
-		melname: row.LastName,
-		meemail: row.Email,
-		mephone: row.PhoneOffice,
-		mepobox: '',
-		meroom: '',
-		mehouse: '',
-		mestreet: currentAddress.street,
-		mecity: currentAddress.city,
-		mestate: currentAddress.state,
-		mezipcode: currentAddress.zipcode,
-		mecountry: currentAddress.country,
-		vcfname: row.FirstName,
-		vclname: row.LastName,
-		vctitle: row.Post,
-		vcorganisation: currentAddress.organisation,
-		vcemail: row.Email,
-		vcphone: row.PhoneOffice,
-		vcpobox: '',
-		vchouse: '',
-		vcstreet: currentAddress.street,
-		vccity: currentAddress.city,
-		vcstate: currentAddress.state,
-		vczipcode: currentAddress.zipcode,
-		vccountry: currentAddress.country,
-		vcurl: row.Website,
-		wifitype: 'nopass',
-		wifissid: '',
-		wifipass: '',
-		black: '#000000',
-		white: '#ffffff',
-		res: '1',
-		level: 'L',
-		generate: '1',
-	};
+	var data = [];
+	data.push("BEGIN:VCARD");
+	data.push("VERSION:3.0");
+	data.push("N:" + row.LastName + ";" + row.FirstName);
+	data.push("FN:" + row.Name);
+	data.push("ORG:" + currentAddress.organisation);
+	data.push("TITLE:" + row.Post);
+	data.push("TEL;TYPE=work,voice:" + row.PhoneOffice);
+	if (row.PhoneMobile) {
+		data.push("TEL;TYPE=cell,voice:" + row.PhoneMobile);
+	}
+	data.push("ADR;TYPE=work:;;" + [ currentAddress.street, currentAddress.city, currentAddress.state, currentAddress.zipcode, currentAddress.country ].join(';') );
+	data.push("TEL;TYPE=work,fax:" + row.Fax);
+	data.push("URL;TYPE=work:" + row.Website);
+	data.push("EMAIL;TYPE=internet,pref:" + row.Email);
+	data.push("REV:20130501T195243Z");
+	data.push("END:VCARD");
 
 	return data;
 }
