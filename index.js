@@ -108,9 +108,17 @@ function getFilename( row ) {
 
 
 function getRow( row ) {
+
+	// Name
 	var nameparts = String(row.Name).split(' ');
 	row.FirstName = nameparts.shift();
 	row.LastName = nameparts.join(' ');
+
+	// Twitter
+	var twitterURL = String(row.twitter);
+	var twitterName = twitterURL.split(/\//).pop();
+	row.twitter = twitterName;
+
 	return row;
 }
 
@@ -137,8 +145,14 @@ function getData( row ) {
 	data.push("ADR;TYPE=work:;;" + [ currentAddress.street, currentAddress.city, currentAddress.state, currentAddress.zipcode, currentAddress.country ].join(';') );
 	data.push("TEL;TYPE=work,fax:" + row.Fax);
 	data.push("URL;TYPE=work:" + row.Website);
-	data.push("EMAIL;TYPE=internet,pref:" + row.Email);
-	data.push("REV:20130501T195243Z");
+	data.push("EMAIL;TYPE=work:" + row.Email);
+	if (row.twitter) {
+		// data.push("X-SOCIALPROFILE;type=twitter;x-user=" + row.twitter + ":http://twitter.com/" + row.twitter);
+		// data.push("X-TWITTER:http://twitter.com/" + row.twitter);
+		// data.push("item2.URL:http\://twitter.com/" + row.twitter)
+		// data.push("item2.X-ABLabel:Twitter")
+		data.push("URL;TYPE=other:http\://twitter.com/" + row.twitter);
+	}
 	data.push("END:VCARD");
 
 	return data;
