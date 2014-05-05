@@ -1,0 +1,41 @@
+{
+	"cardsCSVFile": "data/cards.txt",
+	"extension": "png",
+	"resultDir": "result",
+	"dimensions": "500x500",
+	"defaultLocation": "Germany",
+	"address": {
+		"GermanyNordenstadt": {
+			"organisation": "AOE GmbH",
+			"street": "Borsigstrasse 3",
+			"city": "Wiesbaden",
+			"zipcode": "65205",
+			"state": "",
+			"country": "Germany"
+		},
+		"Germany": {
+			"organisation": "AOE GmbH",
+			"street": "Kirchgasse 6",
+			"city": "Wiesbaden",
+			"zipcode": "65185",
+			"state": "",
+			"country": "Germany"
+		},
+		"US": {
+			"organisation": "AOE Inc.",
+			"street": "700 Airport Blvd, Suite 280",
+			"city": "Burlingame",
+			"zipcode": "94010",
+			"state": "CA",
+			"country": "USA"
+		},
+		"Switzerland": {
+			"organisation": "AOE Switzerland GmbH",
+			"street": "Freigutstrasse 7",
+			"city": "Zürich",
+			"zipcode": "8002",
+			"state": "",
+			"country": "Switzerland"
+		}
+	}
+}

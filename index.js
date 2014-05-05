@@ -9,41 +9,74 @@ var normalizeForSearch = require("normalize-for-search");
 // Constants
 
 var url = "http://chart.apis.google.com/chart"
+var settingsJSONFile = __dirname + '/settings.json';
 
-var address = {
-	'Germany': {
-		organisation: 'AOE GmbH',
-		street: 'Borsigstrasse 3',
-		city: 'Wiesbaden',
-		zipcode: '65205',
-		state: '',
-		country: 'Germany',
-	},
-	'US': {
-		organisation: 'AOE Inc.',
-		street: '700 Airport Blvd, Suite 280',
-		city: 'Burlingame',
-		zipcode: '94010',
-		state: 'CA',
-		country: 'USA',
-	}
-};
+// Variables
 
-
-var defaultLocation = 'Germany';
-
-var extension = 'png';
-
-// Process
-
+var settings = {};
 var requests = [];
+var args = [];
 
-csv()
-.from.path( __dirname + '/data/cards.txt', {
-	delimiter: "\t",
-	columns: true
-})
-.to.array( processData )
+// Functions
+
+function main() {
+
+	// Get default settings
+	fs.readFile(settingsJSONFile, 'utf8', function (err, data) {
+
+		if (err) {
+			console.log('Error: ' + err);
+			return;
+		}
+
+		settings = JSON.parse(data);
+		console.log('Settigns parsed');
+
+		processSettings();
+
+	});
+
+}
+
+
+function processSettings() {
+
+	// Default settings
+	if (!settings.extension) settings.extension = 'png';
+	if (!settings.dimensions) settings.dimensions = '500x500';
+	if (!settings.cardsCSVFile) settings.cardsCSVFile = 'data/cards.txt';
+	if (!settings.resultDir) settings.resultDir = 'result';
+
+	// Get script arguments
+	args = process.argv.slice(2);
+
+	// Override settings
+	if (args[0]) {
+		settings.cardsCSVFile = args[0];
+	}
+
+	// Check if the CSV file exists
+	fs.exists(settings.cardsCSVFile, function(exists) {
+		if (exists) {
+			console.log("Using CSV file: " + settings.cardsCSVFile );
+			processFile();
+		} else {
+			console.log("File was not found: " + settings.cardsCSVFile );
+		}
+	});
+
+}
+
+
+function processFile() {
+	// Read the CSV file
+	csv()
+	.from.path(settings.cardsCSVFile, {
+		delimiter: "\t",
+		columns: true
+	})
+	.to.array( processData )
+}
 
 
 function processData(rows){
@@ -53,7 +86,11 @@ function processData(rows){
 	for ( var i = 0; i < rows.length; i++ ) {
 
 		var row = getRow(rows[i]);
-		if (!row.Name) continue;
+
+		if (!row.Name) {
+			console.log("Row "+i+": Name column was not found");
+			continue;
+		}
 
 		var data = getData(row);
 		var filename = getFilename(row);
@@ -63,7 +100,9 @@ function processData(rows){
 			filename: filename
 		});
 	}
+
 	executeRequest();
+
 }
 
 
@@ -82,7 +121,7 @@ function executeRequest(index) {
 	var filename = requestData.filename;
 
 	var postData = {
-		chs: "500x500",
+		chs: settings.dimensions,
 		cht: "qr",
 		chld: "L|4", // L, M, Q, H | margin
 		chl: data.join("\n"),
@@ -90,11 +129,11 @@ function executeRequest(index) {
 
 	request( url + '?' + querystring.stringify(postData),
 		function(error, respond, body){
-			console.log('QR code generated for '+row.Name);
+			console.log('QR code generated for ' + row.Name);
 			executeRequest(index + 1);
 		}
 	)
-	.pipe(fs.createWriteStream(__dirname + '/result/'+filename+'.'+extension));
+	.pipe(fs.createWriteStream(__dirname + '/'+ settings.resultDir + '/' + filename + '.' + settings.extension));
 
 }
 
@@ -125,10 +164,10 @@ function getRow( row ) {
 
 function getData( row ) {
 
-	var currentAddress = address[row.Location];
+	var currentAddress = settings.address[row.Location];
 	if (!currentAddress) {
-		console.log('Warning! Location was not found for '+ row.Name +', using default: ' + defaultLocation);
-		currentAddress = address[defaultLocation];
+		console.log('Warning! Location was not found for '+ row.Name +', using default: ' + settings.defaultLocation);
+		currentAddress = settings.address[settings.defaultLocation];
 	}
 
 	var data = [];
@@ -137,15 +176,25 @@ function getData( row ) {
 	data.push("N:" + row.LastName + ";" + row.FirstName);
 	data.push("FN:" + row.Name);
 	data.push("ORG:" + currentAddress.organisation);
-	data.push("TITLE:" + row.Post);
-	data.push("TEL;TYPE=work,voice:" + row.PhoneOffice);
+	if (row.Post) {
+		data.push("TITLE:" + row.Post);
+	}
+	if (row.PhoneOffice) {
+		data.push("TEL;TYPE=work,voice:" + row.PhoneOffice);
+	}
 	if (row.PhoneMobile) {
 		data.push("TEL;TYPE=cell,voice:" + row.PhoneMobile);
 	}
 	data.push("ADR;TYPE=work:;;" + [ currentAddress.street, currentAddress.city, currentAddress.state, currentAddress.zipcode, currentAddress.country ].join(';') );
-	data.push("TEL;TYPE=work,fax:" + row.Fax);
-	data.push("URL;TYPE=work:" + row.Website);
-	data.push("EMAIL;TYPE=work:" + row.Email);
+	if (row.Fax) {
+		data.push("TEL;TYPE=work,fax:" + row.Fax);
+	}
+	if (row.Website) {
+		data.push("URL;TYPE=work:" + row.Website);
+	}
+	if (row.Email) {
+		data.push("EMAIL;TYPE=work:" + row.Email);
+	}
 	if (row.twitter) {
 		// data.push("X-SOCIALPROFILE;type=twitter;x-user=" + row.twitter + ":http://twitter.com/" + row.twitter);
 		// data.push("X-TWITTER:http://twitter.com/" + row.twitter);
@@ -158,3 +207,4 @@ function getData( row ) {
 	return data;
 }
 
+main();
